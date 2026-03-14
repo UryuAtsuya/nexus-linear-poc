@@ -1,0 +1,62 @@
+[
+  {
+    "id": "NEX-101",
+    "identifier": "NEX-101",
+    "title": "Prototype the orchestrator happy path",
+    "description": "Fetch a Linear issue, prepare a Claude execution context, and build a GitHub PR draft payload.",
+    "priority": "medium",
+    "labels": [
+      "poc",
+      "orchestrator",
+      "ai-ready"
+    ],
+    "assignee": "pm@nexus.dev",
+    "repository": "uryuatsuya/nexus-linear-poc",
+    "team": "Nexus",
+    "state": "todo"
+  },
+  {
+    "id": "NEX-102",
+    "identifier": "NEX-102",
+    "title": "Prepare isolated issue comment output",
+    "description": "Validate issue comment output while using an isolated run workspace.",
+    "priority": "low",
+    "labels": [
+      "poc",
+      "ai-ready"
+    ],
+    "assignee": "reviewer@nexus.dev",
+    "repository": "uryuatsuya/nexus-linear-poc",
+    "team": "Nexus",
+    "state": "todo"
+  },
+  {
+    "id": "NEX-201",
+    "identifier": "NEX-201",
+    "title": "Blocked example without approval label",
+    "description": "This issue should be rejected because it is not marked as ai-ready.",
+    "priority": "low",
+    "labels": [
+      "poc"
+    ],
+    "assignee": "pm@nexus.dev",
+    "repository": "uryuatsuya/nexus-linear-poc",
+    "team": "Nexus",
+    "state": "todo"
+  },
+  {
+    "id": "NEX-301",
+    "identifier": "NEX-301",
+    "title": "Rotate auth token permission flow",
+    "description": "Touch the auth token permission handling used by the login gateway.",
+    "priority": "low",
+    "labels": [
+      "poc",
+      "ai-ready"
+    ],
+    "assignee": "security@nexus.dev",
+    "repository": "uryuatsuya/nexus-linear-poc",
+    "team": "Nexus",
+    "state": "todo"
+  }
+]

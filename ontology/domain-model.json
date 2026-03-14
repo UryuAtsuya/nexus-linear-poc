@@ -1,0 +1,274 @@
+{
+  "id": "nexus-linear-poc-ontology",
+  "version": "0.1.0",
+  "description": "Domain ontology for mapping Linear issues to run areas, related files, and automation risk in the PoC.",
+  "entities": [
+    {
+      "id": "linear.issue",
+      "name": "Linear Issue",
+      "type": "external-source",
+      "description": "The issue that starts an automation run.",
+      "relatedFiles": [
+        "packages/linear-client/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ]
+    },
+    {
+      "id": "policy.decision",
+      "name": "Policy Decision",
+      "type": "guardrail",
+      "description": "Eligibility decision for whether the issue can be automated.",
+      "relatedFiles": [
+        "packages/policy-engine/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ]
+    },
+    {
+      "id": "orchestrator.run",
+      "name": "Orchestrator Run",
+      "type": "workflow",
+      "description": "A single execution unit for one Linear issue.",
+      "relatedFiles": [
+        "apps/orchestrator/src/index.js",
+        "packages/runner-manager/src/index.js"
+      ]
+    },
+    {
+      "id": "runner.worktree",
+      "name": "Runner Worktree",
+      "type": "workspace",
+      "description": "Isolated workspace created per issue run.",
+      "relatedFiles": [
+        "packages/runner-manager/src/index.js"
+      ]
+    },
+    {
+      "id": "claude.task",
+      "name": "Claude Task",
+      "type": "execution",
+      "description": "Claude Code execution that edits code and returns structured output.",
+      "relatedFiles": [
+        "packages/claude-runner/src/index.js"
+      ]
+    },
+    {
+      "id": "github.pull-request",
+      "name": "GitHub Pull Request",
+      "type": "delivery",
+      "description": "The PR or PR-like output created after successful validation.",
+      "relatedFiles": [
+        "packages/github-client/src/index.js"
+      ]
+    },
+    {
+      "id": "linear.sync",
+      "name": "Linear Sync",
+      "type": "feedback",
+      "description": "Status or result returned back to the original Linear issue.",
+      "relatedFiles": [
+        "packages/linear-client/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "linear.issue",
+      "to": "policy.decision",
+      "type": "evaluated-by"
+    },
+    {
+      "from": "policy.decision",
+      "to": "orchestrator.run",
+      "type": "gates"
+    },
+    {
+      "from": "orchestrator.run",
+      "to": "runner.worktree",
+      "type": "prepares"
+    },
+    {
+      "from": "orchestrator.run",
+      "to": "claude.task",
+      "type": "executes"
+    },
+    {
+      "from": "claude.task",
+      "to": "github.pull-request",
+      "type": "produces"
+    },
+    {
+      "from": "github.pull-request",
+      "to": "linear.sync",
+      "type": "reported-back-to"
+    }
+  ],
+  "areas": [
+    {
+      "id": "issue-intake",
+      "name": "Issue Intake",
+      "risk": "low",
+      "match": {
+        "labels": [
+          "ai-ready",
+          "poc"
+        ],
+        "keywords": [
+          "issue",
+          "linear",
+          "trigger",
+          "job"
+        ]
+      },
+      "entities": [
+        "linear.issue",
+        "policy.decision",
+        "linear.sync"
+      ],
+      "relatedFiles": [
+        "packages/linear-client/src/index.js",
+        "packages/policy-engine/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ],
+      "suggestedTests": [
+        "tests/integration/orchestrator.test.js"
+      ],
+      "suggestedCommands": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "orchestration-flow",
+      "name": "Orchestration Flow",
+      "risk": "low",
+      "match": {
+        "labels": [
+          "orchestrator"
+        ],
+        "keywords": [
+          "orchestrator",
+          "context",
+          "workflow",
+          "run"
+        ]
+      },
+      "entities": [
+        "orchestrator.run",
+        "claude.task",
+        "github.pull-request"
+      ],
+      "relatedFiles": [
+        "apps/orchestrator/src/index.js",
+        "packages/claude-runner/src/index.js",
+        "packages/github-client/src/index.js"
+      ],
+      "suggestedTests": [
+        "tests/integration/orchestrator.test.js"
+      ],
+      "suggestedCommands": [
+        "npm test",
+        "npm run prototype -- --issue-id NEX-101 --quiet"
+      ]
+    },
+    {
+      "id": "workspace-isolation",
+      "name": "Workspace Isolation",
+      "risk": "medium",
+      "match": {
+        "keywords": [
+          "worktree",
+          "workspace",
+          "branch",
+          "isolated"
+        ]
+      },
+      "entities": [
+        "runner.worktree",
+        "orchestrator.run"
+      ],
+      "relatedFiles": [
+        "packages/runner-manager/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ],
+      "suggestedTests": [
+        "tests/integration/orchestrator.test.js"
+      ],
+      "suggestedCommands": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "github-pr-output",
+      "name": "GitHub PR Output",
+      "risk": "low",
+      "match": {
+        "keywords": [
+          "pr",
+          "pull request",
+          "github",
+          "comment"
+        ]
+      },
+      "entities": [
+        "github.pull-request",
+        "linear.sync"
+      ],
+      "relatedFiles": [
+        "packages/github-client/src/index.js",
+        "apps/orchestrator/src/index.js"
+      ],
+      "suggestedTests": [
+        "tests/integration/orchestrator.test.js"
+      ],
+      "suggestedCommands": [
+        "npm run prototype -- --issue-id NEX-102 --github-target issue-comment --quiet --no-artifacts"
+      ]
+    },
+    {
+      "id": "identity-and-billing-core",
+      "name": "Identity and Billing Core",
+      "risk": "high",
+      "match": {
+        "labels": [
+          "high-risk"
+        ],
+        "keywords": [
+          "billing",
+          "payment",
+          "auth token",
+          "permission",
+          "subscription"
+        ]
+      },
+      "entities": [
+        "policy.decision",
+        "claude.task"
+      ],
+      "relatedFiles": [
+        "packages/policy-engine/src/index.js"
+      ],
+      "suggestedTests": [
+        "manual-review-required"
+      ],
+      "suggestedCommands": [
+        "manual-review-required"
+      ]
+    }
+  ],
+  "riskRules": [
+    {
+      "id": "high-risk-areas-require-human",
+      "when": {
+        "areaRisk": "high"
+      },
+      "effect": "manual-review-required"
+    },
+    {
+      "id": "medium-risk-areas-need-verification",
+      "when": {
+        "areaRisk": "medium"
+      },
+      "effect": "extra-verification"
+    }
+  ]
+}

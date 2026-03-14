@@ -1,0 +1,16 @@
+{
+  "name": "nexus-linear-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "prototype": "node scripts/run-prototype.mjs",
+    "webhook": "node apps/webhook-gateway/src/index.js",
+    "webhook:dev": "node --watch apps/webhook-gateway/src/index.js",
+    "test": "node --test tests/integration/orchestrator.test.js"
+  }
+}
