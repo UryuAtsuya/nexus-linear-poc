@@ -166,6 +166,7 @@ async function runClaudeCli({
   const commandResult = await commandRunner(command, cliArgs, {
     cwd: run.directories.worktreePath,
     encoding: "utf8",
+    input: "",          // close stdin so claude doesn't wait for TTY input
     env: {
       ...process.env,
       NEXUS_ISSUE_ID: issue.identifier,
@@ -291,8 +292,17 @@ function parseClaudeOutput(rawOutput) {
   try {
     const parsed = JSON.parse(rawOutput);
 
-    if (parsed && typeof parsed === "object" && parsed.result) {
-      return parsed.result;
+    if (parsed && typeof parsed === "object") {
+      // --json-schema produces structured_output; prefer it over result
+      if (parsed.structured_output && typeof parsed.structured_output === "object") {
+        return parsed.structured_output;
+      }
+      if (parsed.result && typeof parsed.result === "object") {
+        return parsed.result;
+      }
+      if (typeof parsed.result === "string" && parsed.result) {
+        return { summary: parsed.result };
+      }
     }
 
     return parsed;
