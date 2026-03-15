@@ -1,11 +1,46 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
+// Spawn claude with stdin closed so it never blocks on TTY input.
+function spawnAsync(file, args, options) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(file, args, {
+      ...options,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (d) => { stdout += d; });
+    proc.stderr.on("data", (d) => { stderr += d; });
+    const timer = options.timeout
+      ? setTimeout(() => {
+          proc.kill("SIGTERM");
+        }, options.timeout)
+      : null;
+    proc.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        const err = Object.assign(new Error(`Command failed: ${file} ${args.join(" ")}`), {
+          code,
+          killed: code === null,
+          stdout,
+          stderr
+        });
+        reject(err);
+      }
+    });
+    proc.on("error", (err) => {
+      if (timer) clearTimeout(timer);
+      reject(Object.assign(err, { stdout, stderr }));
+    });
+  });
+}
 const DEFAULT_CLAUDE_COMMAND = process.env.CLAUDE_CODE_COMMAND ?? "claude";
-const DEFAULT_PERMISSION_MODE = "acceptEdits";
+const DEFAULT_PERMISSION_MODE = "bypassPermissions";
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const DEFAULT_ALLOWED_TOOLS = [
   "Read",
   "Edit",
@@ -68,7 +103,8 @@ export function createClaudeRunner({
   model = process.env.CLAUDE_CODE_MODEL ?? null,
   permissionMode = DEFAULT_PERMISSION_MODE,
   allowedTools = DEFAULT_ALLOWED_TOOLS,
-  commandRunner = execFileAsync
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  commandRunner = spawnAsync
 } = {}) {
   return {
     async run({ issue, objective, executionContext, run }) {
@@ -90,6 +126,7 @@ export function createClaudeRunner({
           model,
           permissionMode,
           allowedTools,
+          timeoutMs,
           commandRunner
         });
       }
@@ -138,6 +175,7 @@ async function runClaudeCli({
   model,
   permissionMode,
   allowedTools,
+  timeoutMs,
   commandRunner
 }) {
   const systemPromptPath = path.join(
@@ -154,27 +192,48 @@ async function runClaudeCli({
     writeFile(userPromptPath, `${prompts.user}\n`, "utf8")
   ]);
 
+  // For scaffold mode the worktreePath is an empty temp dir; use the real
+  // repo root so Claude has actual code to read.
+  const effectivePath =
+    run.workspaceMode === "scaffold"
+      ? run.repoRoot
+      : run.directories.worktreePath;
+
+  // scaffold mode is analysis-only – no write tools needed.
+  const effectiveTools =
+    run.workspaceMode === "scaffold"
+      ? allowedTools.filter((t) => ["Read", "Glob", "Grep", "LS"].includes(t))
+      : allowedTools;
+
   const cliArgs = buildClaudeCliArgs({
     args,
     systemPrompt: prompts.system,
     userPrompt: prompts.user,
     model,
     permissionMode,
-    allowedTools,
-    worktreePath: run.directories.worktreePath
+    allowedTools: effectiveTools,
+    worktreePath: effectivePath
   });
-  const commandResult = await commandRunner(command, cliArgs, {
-    cwd: run.directories.worktreePath,
-    encoding: "utf8",
-    input: "",          // close stdin so claude doesn't wait for TTY input
-    env: {
-      ...process.env,
-      NEXUS_ISSUE_ID: issue.identifier,
-      NEXUS_OBJECTIVE: objective,
-      NEXUS_BRANCH_NAME: run.branchName,
-      NEXUS_WORKTREE_PATH: run.directories.worktreePath
-    }
-  });
+  let commandResult;
+  try {
+    commandResult = await commandRunner(command, cliArgs, {
+      cwd: effectivePath,
+      encoding: "utf8",
+      timeout: timeoutMs,
+      env: {
+        ...process.env,
+        NEXUS_ISSUE_ID: issue.identifier,
+        NEXUS_OBJECTIVE: objective,
+        NEXUS_BRANCH_NAME: run.branchName,
+        NEXUS_WORKTREE_PATH: run.directories.worktreePath
+      }
+    });
+  } catch (err) {
+    const stderr = String(err.stderr ?? "").trim();
+    const stdout = String(err.stdout ?? "").trim();
+    const detail = stderr || stdout || err.message;
+    throw Object.assign(err, { claudeStderr: stderr, claudeStdout: stdout, detail });
+  }
   const rawOutput = String(commandResult.stdout ?? "").trim();
   const parsedOutput = parseClaudeOutput(rawOutput);
   const summary =
@@ -224,6 +283,11 @@ function buildClaudeCliArgs({
 
   if (!cliArgs.includes("--print") && !cliArgs.includes("-p")) {
     cliArgs.push("--print");
+  }
+
+  // Skip user-level settings (plugins, etc.) for a clean, reproducible subprocess.
+  if (!cliArgs.includes("--setting-sources")) {
+    cliArgs.push("--setting-sources", "project,local");
   }
 
   if (!cliArgs.includes("--output-format")) {
