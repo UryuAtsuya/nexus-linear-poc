@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -60,6 +60,28 @@ export function createRunnerManager({
           artifactsDirectory
         }
       };
+    },
+
+    async cleanupRun(run) {
+      if (!run) return;
+
+      if (run.workspaceMode === "git-worktree") {
+        try {
+          await runGit({
+            gitBin,
+            cwd: run.repoRoot,
+            args: ["worktree", "remove", "--force", run.directories.worktreePath]
+          });
+        } catch {
+          // best-effort: the worktree path may not exist if the run failed early
+        }
+      }
+
+      try {
+        await rm(run.directories.workspaceRoot, { recursive: true, force: true });
+      } catch {
+        // best-effort
+      }
     }
   };
 }

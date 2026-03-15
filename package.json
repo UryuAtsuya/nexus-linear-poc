@@ -11,6 +11,8 @@
     "prototype": "node scripts/run-prototype.mjs",
     "webhook": "node apps/webhook-gateway/src/index.js",
     "webhook:dev": "node --watch apps/webhook-gateway/src/index.js",
-    "test": "node --test tests/integration/orchestrator.test.js"
+    "test": "node --test tests/integration/orchestrator.test.js",
+    "cleanup-runs": "node scripts/cleanup-runs.mjs",
+    "cleanup-runs:dry": "node scripts/cleanup-runs.mjs --dry-run"
   }
 }

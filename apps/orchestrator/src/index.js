@@ -53,6 +53,7 @@ export async function runPrototype({
   notifyLinear = false,
   repoRoot = process.cwd(),
   writeArtifacts = true,
+  cleanup = true,
   linearClientOptions = {},
   claudeRunnerOptions = {},
   githubClientOptions = {},
@@ -65,6 +66,7 @@ export async function runPrototype({
     return entry;
   };
   let loadedIssue = null;
+  let preparedRun = null;
 
   const linearClient = createLinearClient({
     fixturePath,
@@ -170,6 +172,7 @@ export async function runPrototype({
       workspaceMode,
       baseRef
     });
+    preparedRun = run;
     pushEvent("run.prepared", {
       runId: run.runId,
       branchName: run.branchName,
@@ -324,6 +327,10 @@ export async function runPrototype({
     }
 
     return failure;
+  } finally {
+    if (cleanup && preparedRun) {
+      await runnerManager.cleanupRun(preparedRun).catch(() => {});
+    }
   }
 }
 

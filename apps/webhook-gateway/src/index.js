@@ -7,6 +7,9 @@ const PORT = process.env.PORT ?? 3000;
 const WEBHOOK_SECRET = process.env.LINEAR_WEBHOOK_SECRET ?? "";
 const AI_READY_LABEL = process.env.AI_READY_LABEL ?? "ai-ready";
 
+// Prevent the same issue from being processed concurrently.
+const inFlightIssues = new Set();
+
 // ── signature ──────────────────────────────────────────────────────────────
 
 function verifySignature(rawBody, header) {
@@ -95,16 +98,25 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (inFlightIssues.has(issueId)) {
+    console.log(`[webhook] ${issueId} already in flight — skipping duplicate`);
+    return;
+  }
+
   console.log(
     `[webhook] ${payload.action} ${issueId} has label "${AI_READY_LABEL}" — starting orchestrator`
   );
 
+  inFlightIssues.add(issueId);
   runPrototype(buildRunOptions(issueId))
     .then((result) => {
       console.log(`[webhook] ${issueId} finished: ${result.status}`);
     })
     .catch((err) => {
       console.error(`[webhook] ${issueId} error: ${err.message}`);
+    })
+    .finally(() => {
+      inFlightIssues.delete(issueId);
     });
 }
 
