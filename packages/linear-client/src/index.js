@@ -17,47 +17,55 @@ export function createLinearClient({
         return getFixtureIssue({ fixturePath, issueId });
       }
 
-      const payload = await requestLinearGraphQL({
-        endpoint,
-        apiKey,
-        fetchImpl,
-        query: `
-          query Issue($id: String!) {
-            issue(id: $id) {
-              id
-              identifier
-              title
-              description
-              priority
-              state {
-                name
-              }
-              assignee {
-                name
-                email
-              }
-              labels {
-                nodes {
-                  name
-                }
-              }
-              team {
-                key
-                name
+      const issueFields = `
+        id
+        identifier
+        title
+        description
+        priority
+        state { name }
+        assignee { name email }
+        labels { nodes { name } }
+        team { key name }
+      `;
+
+      let rawIssue;
+
+      if (isUUID(issueId)) {
+        const payload = await requestLinearGraphQL({
+          endpoint,
+          apiKey,
+          fetchImpl,
+          query: `
+            query Issue($id: String!) {
+              issue(id: $id) { ${issueFields} }
+            }
+          `,
+          variables: { id: issueId }
+        });
+        rawIssue = payload.issue;
+      } else {
+        const payload = await requestLinearGraphQL({
+          endpoint,
+          apiKey,
+          fetchImpl,
+          query: `
+            query IssueByIdentifier($identifier: String!) {
+              issues(filter: { identifier: { eq: $identifier } }) {
+                nodes { ${issueFields} }
               }
             }
-          }
-        `,
-        variables: {
-          id: issueId
-        }
-      });
+          `,
+          variables: { identifier: issueId }
+        });
+        rawIssue = payload.issues?.nodes?.[0] ?? null;
+      }
 
-      if (!payload.issue) {
+      if (!rawIssue) {
         throw new Error(`Linear issue "${issueId}" was not found via API.`);
       }
 
-      return normalizeIssue(payload.issue, { defaultRepository });
+      return normalizeIssue(rawIssue, { defaultRepository });
     },
 
     async publishRunUpdate({
@@ -257,6 +265,10 @@ function normalizePriority(priority) {
   }
 
   return "medium";
+}
+
+function isUUID(id) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
 function createLinearUpdateBody({ issue, status, body, linkUrl }) {

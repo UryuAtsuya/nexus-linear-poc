@@ -307,62 +307,50 @@ test("runPrototype can execute claude cli mode and create a local commit", async
   assert.match(committedFiles, /notes\.md/);
 });
 
-test("createLinearClient uses the Linear API request shape", async () => {
+const MOCK_ISSUE_RESPONSE = {
+  id: "lin_123",
+  identifier: "NEX-900",
+  title: "Fetched from API",
+  description: "Loaded through GraphQL",
+  priority: 4,
+  state: { name: "Todo" },
+  assignee: { email: "pm@nexus.dev" },
+  labels: { nodes: [{ name: "ai-ready" }] },
+  team: { key: "NEX" }
+};
+
+const MOCK_COMMENT_RESPONSE = {
+  commentCreate: {
+    success: true,
+    comment: {
+      id: "comment_123",
+      body: "posted",
+      url: "https://linear.app/comment/123"
+    }
+  }
+};
+
+test("createLinearClient uses issue(id) query for UUID-style IDs", async () => {
   const requests = [];
+  const uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
   const client = createLinearClient({
     mode: "api",
     apiKey: "lin_api_test",
     defaultRepository: "nexus/poc",
     fetchImpl: async (url, init) => {
-      requests.push({
-        url,
-        init
-      });
-
+      requests.push({ url, init });
       const payload = JSON.parse(init.body);
 
       if (payload.query.includes("query Issue")) {
-        return createJsonResponse({
-          data: {
-            issue: {
-              id: "lin_123",
-              identifier: "NEX-900",
-              title: "Fetched from API",
-              description: "Loaded through GraphQL",
-              priority: 4,
-              state: {
-                name: "Todo"
-              },
-              assignee: {
-                email: "pm@nexus.dev"
-              },
-              labels: {
-                nodes: [{ name: "ai-ready" }]
-              },
-              team: {
-                key: "NEX"
-              }
-            }
-          }
-        });
+        return createJsonResponse({ data: { issue: MOCK_ISSUE_RESPONSE } });
       }
 
-      return createJsonResponse({
-        data: {
-          commentCreate: {
-            success: true,
-            comment: {
-              id: "comment_123",
-              body: "posted",
-              url: "https://linear.app/comment/123"
-            }
-          }
-        }
-      });
+      return createJsonResponse({ data: MOCK_COMMENT_RESPONSE });
     }
   });
 
-  const issue = await client.getIssue("NEX-900");
+  const issue = await client.getIssue(uuid);
   const update = await client.publishRunUpdate({
     issue,
     status: "succeeded",
@@ -378,7 +366,61 @@ test("createLinearClient uses the Linear API request shape", async () => {
   assert.equal(requests[0].init.headers.authorization, "lin_api_test");
   assert.match(requests[0].url, /api\.linear\.app\/graphql$/);
   assert.match(JSON.parse(requests[0].init.body).query, /query Issue/);
+  assert.deepEqual(JSON.parse(requests[0].init.body).variables, { id: uuid });
   assert.match(JSON.parse(requests[1].init.body).query, /mutation CommentCreate/);
+});
+
+test("createLinearClient uses issues(filter) query for identifier-style IDs", async () => {
+  const requests = [];
+
+  const client = createLinearClient({
+    mode: "api",
+    apiKey: "lin_api_test",
+    defaultRepository: "nexus/poc",
+    fetchImpl: async (url, init) => {
+      requests.push({ url, init });
+      const payload = JSON.parse(init.body);
+
+      if (payload.query.includes("IssueByIdentifier")) {
+        return createJsonResponse({
+          data: { issues: { nodes: [MOCK_ISSUE_RESPONSE] } }
+        });
+      }
+
+      return createJsonResponse({ data: MOCK_COMMENT_RESPONSE });
+    }
+  });
+
+  const issue = await client.getIssue("NEX-900");
+  const update = await client.publishRunUpdate({
+    issue,
+    status: "succeeded",
+    body: "Prototype finished."
+  });
+
+  assert.equal(issue.identifier, "NEX-900");
+  assert.equal(issue.priority, "low");
+  assert.equal(update.published, true);
+  assert.equal(requests.length, 2);
+  assert.match(JSON.parse(requests[0].init.body).query, /IssueByIdentifier/);
+  assert.deepEqual(JSON.parse(requests[0].init.body).variables, {
+    identifier: "NEX-900"
+  });
+  assert.match(JSON.parse(requests[1].init.body).query, /mutation CommentCreate/);
+});
+
+test("createLinearClient throws when identifier-style issue is not found", async () => {
+  const client = createLinearClient({
+    mode: "api",
+    apiKey: "lin_api_test",
+    fetchImpl: async () =>
+      createJsonResponse({ data: { issues: { nodes: [] } } })
+  });
+
+  await assert.rejects(
+    () => client.getIssue("NEX-999"),
+    /NEX-999.*not found/
+  );
 });
 
 test("createGitHubClient can publish a PR through the GitHub API adapter", async () => {
