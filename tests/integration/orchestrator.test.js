@@ -209,7 +209,8 @@ test("runPrototype can provision a real git worktree", async (t) => {
     outputDir,
     repoRoot,
     workspaceMode: "git-worktree",
-    baseRef: "main"
+    baseRef: "main",
+    cleanup: false
   });
 
   assert.equal(result.status, "succeeded");
@@ -253,6 +254,7 @@ test("runPrototype can execute claude cli mode and create a local commit", async
     claudeMode: "cli",
     githubMode: "local-commit",
     writeArtifacts: false,
+    cleanup: false,
     claudeRunnerOptions: {
       command: "mock-claude",
       commandRunner: async (command, args, options) => {

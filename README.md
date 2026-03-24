@@ -28,6 +28,48 @@ GitHub Pull Request   ← コード変更
 
 merge は必ず人間がやる前提。対象は低リスク task のみ。
 
+## Ontology
+
+このシステムは単なるスクリプト自動化ではなく、**ontology-driven な判断**をしている。
+issue の内容をドメイン概念へ写像し、リスク評価に基づいて実行可否を決める。
+
+### エンティティとリレーション
+
+```
+linear.issue
+  │  evaluated-by
+  ▼
+policy.decision  ◀── riskRules
+  │                    high   → 自動実行停止 (manual-review-required)
+  │                    medium → 追加検証 (extra-verification)
+  │  gates
+  ▼
+orchestrator.run
+  ├─ prepares ──▶ runner.worktree   (isolated git worktree)
+  └─ executes ──▶ claude.task
+                    │  produces
+                    ▼
+                github.pull-request
+                    │  reported-back-to
+                    ▼
+                linear.sync
+```
+
+### Areas（ドメイン領域 × リスク）
+
+| Area | Risk | マッチ条件 (keywords / labels) |
+|---|---|---|
+| Issue Intake | 🟢 low | `ai-ready`, `poc`, `issue`, `linear` |
+| Orchestration Flow | 🟢 low | `orchestrator`, `workflow`, `run` |
+| Workspace Isolation | 🟡 medium | `worktree`, `workspace`, `branch` |
+| GitHub PR Output | 🟢 low | `pr`, `pull request`, `github` |
+| Identity & Billing Core | 🔴 high | `billing`, `payment`, `auth token`, `subscription` |
+
+`high` に分類された issue は policy-engine が自動実行をブロックし、人間レビューを必須にする。
+`medium` は worktree を使った隔離実行を前提に、追加検証ステップを挟む。
+
+ontology の実体は [`ontology/domain-model.json`](./ontology/domain-model.json)。
+
 ## ドキュメント
 
 - [docs/requirements/poc-v1.md](./docs/requirements/poc-v1.md)
@@ -190,5 +232,6 @@ pnpm test
 | フェーズ | 状態 | 内容 |
 |---|---|---|
 | Phase 1 | ✅ 完了 | orchestrator / 全パッケージ / integration tests |
-| Phase 2 (今ここ) | 🔧 進行中 | webhook-gateway 実装済み、Claude CLI 実動作確認中 |
-| Phase 3 | 📋 予定 | run 状態永続化、worktree cleanup、並列実行対応 |
+| Phase 2 | ✅ 完了 | webhook-gateway 実装済み、Claude CLI 実動作確認済み |
+| Phase 3 | ✅ 完了 | worktree cleanup、concurrent run dedup、artifact retention、webhook tests |
+| Phase 4 (今ここ) | 🔧 進行中 | 実 API 接続: Linear / GitHub / フル webhook フロー |
