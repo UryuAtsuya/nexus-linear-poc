@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "webhook-gateway",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["apps/webhook-gateway/src/index.js"],
+      "port": 3000
+    },
+    {
+      "name": "webhook-gateway (dev/watch)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--watch", "apps/webhook-gateway/src/index.js"],
+      "port": 3000
+    },
+    {
+      "name": "prototype (dry run)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/run-prototype.mjs", "--quiet"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}
