@@ -68,18 +68,24 @@ export function createLinearClient({
         });
         rawIssue = payload.issue;
       } else {
+        // identifier形式 (例: NEX-1) → teamKey と number に分解して検索
+        const match = issueId.match(/^([A-Z]+)-(\d+)$/);
+        if (!match) {
+          throw new Error(`Invalid issue identifier format: "${issueId}". Expected format: TEAM-NUMBER (e.g. NEX-1)`);
+        }
+        const [, teamKey, issueNumber] = match;
         const payload = await requestLinearGraphQL({
           endpoint,
           apiKey,
           fetchImpl,
           query: `
-            query IssueByIdentifier($identifier: String!) {
-              issues(filter: { identifier: { eq: $identifier } }) {
+            query IssueByIdentifier($teamKey: String!, $number: Float!) {
+              issues(filter: { number: { eq: $number }, team: { key: { eq: $teamKey } } }) {
                 nodes { ${issueFields} }
               }
             }
           `,
-          variables: { identifier: issueId }
+          variables: { teamKey, number: Number(issueNumber) }
         });
         rawIssue = payload.issues?.nodes?.[0] ?? null;
       }
