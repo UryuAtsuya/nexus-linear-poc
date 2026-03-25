@@ -404,7 +404,8 @@ test("createLinearClient uses issues(filter) query for identifier-style IDs", as
   assert.equal(requests.length, 2);
   assert.match(JSON.parse(requests[0].init.body).query, /IssueByIdentifier/);
   assert.deepEqual(JSON.parse(requests[0].init.body).variables, {
-    identifier: "NEX-900"
+    teamKey: "NEX",
+    number: 900
   });
   assert.match(JSON.parse(requests[1].init.body).query, /mutation CommentCreate/);
 });
