@@ -21,6 +21,17 @@ const DEFAULT_GITHUB_MODE = "draft-only";
 const DEFAULT_OBJECTIVE =
   "Validate the Linear -> Orchestrator -> Claude Runner -> GitHub prototype flow.";
 
+/**
+ * Creates a simple event logger.
+ *
+ * Each call to `log()` returns a timestamped entry and, unless `silent` is
+ * true, writes a formatted line via `sink`.
+ *
+ * @param {object} [options]
+ * @param {boolean}  [options.silent=false] - Suppress console output.
+ * @param {Function} [options.sink=console.log] - Output function.
+ * @returns {{ log: Function }}
+ */
 export function createLogger({ silent = false, sink = console.log } = {}) {
   return {
     log(event, details = {}) {
@@ -39,6 +50,41 @@ export function createLogger({ silent = false, sink = console.log } = {}) {
   };
 }
 
+/**
+ * Runs the full Linear → Ontology → Policy → Claude → GitHub pipeline.
+ *
+ * Steps:
+ * 1. Fetch issue from Linear (fixture or API).
+ * 2. Build ontology context for risk / area classification.
+ * 3. Evaluate policy – abort with status "blocked" if not eligible.
+ * 4. Prepare a git run directory / worktree via RunnerManager.
+ * 5. Execute Claude with the enriched execution context.
+ * 6. Prepare GitHub output (PR draft or issue comment).
+ * 7. Publish output to GitHub.
+ * 8. Optionally post a status comment back to Linear.
+ * 9. Persist JSON and markdown artefacts to disk.
+ *
+ * @param {object} [options]
+ * @param {string}  [options.issueId]         - Linear issue ID or identifier.
+ * @param {string}  [options.fixturePath]     - Path to fixture JSON (fixture mode).
+ * @param {string}  [options.githubTarget]    - "pr-draft" | "issue-comment".
+ * @param {string}  [options.outputDir]       - Base directory for run artefacts.
+ * @param {string}  [options.ontologyPath]    - Path to ontology domain model JSON.
+ * @param {string}  [options.workspaceMode]   - "scaffold" | "git-worktree".
+ * @param {string}  [options.baseRef]         - Git base ref for worktree creation.
+ * @param {string}  [options.linearMode]      - "fixture" | "api".
+ * @param {string}  [options.claudeMode]      - "stub" | "cli".
+ * @param {string}  [options.githubMode]      - "draft-only" | "local-commit" | "api".
+ * @param {boolean} [options.notifyLinear]    - Post a comment back to Linear.
+ * @param {string}  [options.repoRoot]        - Absolute path to the repository root.
+ * @param {boolean} [options.writeArtifacts]  - Write artefact files to disk.
+ * @param {boolean} [options.cleanup]         - Remove worktree after execution.
+ * @param {object}  [options.linearClientOptions]  - Extra options for LinearClient.
+ * @param {object}  [options.claudeRunnerOptions]  - Extra options for ClaudeRunner.
+ * @param {object}  [options.githubClientOptions]  - Extra options for GitHubClient.
+ * @param {object}  [options.logger]          - Logger instance (createLogger()).
+ * @returns {Promise<object>} Result object with status, artefacts, and timeline.
+ */
 export async function runPrototype({
   issueId = DEFAULT_ISSUE_ID,
   fixturePath = DEFAULT_FIXTURE_PATH,
@@ -334,6 +380,16 @@ export async function runPrototype({
   }
 }
 
+/**
+ * CLI entry point.
+ *
+ * Parses `argv`, runs the prototype, and writes JSON to stdout (success) or
+ * stderr (failure). Sets `process.exitCode = 1` on failure.
+ *
+ * @param {string[]} [argv=process.argv.slice(2)] - CLI argument list.
+ * @param {object}   [io=process] - I/O streams object with `stdout` / `stderr`.
+ * @returns {Promise<object>} The run result object.
+ */
 export async function main(argv = process.argv.slice(2), io = process) {
   const options = parseArgs(argv);
   const logger = createLogger({ silent: options.quiet });
@@ -365,6 +421,28 @@ export async function main(argv = process.argv.slice(2), io = process) {
   return result;
 }
 
+/**
+ * Parses CLI arguments into an options object consumed by `runPrototype`.
+ *
+ * Recognised flags:
+ *   --issue-id <id>         Linear issue ID (default: NEX-101)
+ *   --fixture <path>        Path to fixture JSON
+ *   --github-target <t>     "pr-draft" | "issue-comment"
+ *   --output-dir <dir>      Base output directory
+ *   --ontology <path>       Ontology model path
+ *   --workspace-mode <m>    "scaffold" | "git-worktree"
+ *   --base-ref <ref>        Git base ref
+ *   --linear-mode <m>       "fixture" | "api"
+ *   --claude-mode <m>       "stub" | "cli"
+ *   --github-mode <m>       "draft-only" | "local-commit" | "api"
+ *   --notify-linear         Post update comment to Linear
+ *   --repo-root <path>      Repository root path
+ *   --no-artifacts          Skip writing artefact files
+ *   --quiet                 Suppress logger output
+ *
+ * @param {string[]} argv - Raw argument array (e.g. process.argv.slice(2)).
+ * @returns {object} Parsed options object.
+ */
 export function parseArgs(argv) {
   const options = {
     issueId: DEFAULT_ISSUE_ID,

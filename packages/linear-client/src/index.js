@@ -3,6 +3,22 @@ import path from "node:path";
 
 const DEFAULT_LINEAR_ENDPOINT = "https://api.linear.app/graphql";
 
+/**
+ * Creates a Linear API client.
+ *
+ * Supports two modes:
+ * - "fixture" – reads issue data from a local JSON file (no network calls).
+ * - "api"     – fetches from the Linear GraphQL API using LINEAR_API_KEY.
+ *
+ * @param {object} [options]
+ * @param {string} [options.fixturePath] - Path to a fixture JSON file (enables fixture mode).
+ * @param {"fixture"|"api"} [options.mode] - Explicit mode override.
+ * @param {string} [options.apiKey] - Linear API key (defaults to LINEAR_API_KEY env var).
+ * @param {string} [options.endpoint] - GraphQL endpoint URL.
+ * @param {Function} [options.fetchImpl] - Fetch implementation (defaults to globalThis.fetch).
+ * @param {string|null} [options.defaultRepository] - Fallback "owner/repo" string for issues.
+ * @returns {{ getIssue: Function, publishRunUpdate: Function }}
+ */
 export function createLinearClient({
   fixturePath,
   mode = fixturePath ? "fixture" : "api",
@@ -12,6 +28,13 @@ export function createLinearClient({
   defaultRepository = null
 } = {}) {
   return {
+    /**
+     * Fetches a Linear issue by UUID or identifier (e.g. "NEX-101").
+     * Normalises the raw API response into a consistent schema.
+     *
+     * @param {string} issueId - Linear issue UUID or identifier string.
+     * @returns {Promise<object>} Normalised issue object.
+     */
     async getIssue(issueId) {
       if (mode === "fixture") {
         return getFixtureIssue({ fixturePath, issueId });
@@ -68,6 +91,17 @@ export function createLinearClient({
       return normalizeIssue(rawIssue, { defaultRepository });
     },
 
+    /**
+     * Posts a run-status comment to a Linear issue.
+     * In fixture mode the call is a no-op and `published` is false.
+     *
+     * @param {object} params
+     * @param {object} params.issue - Normalised Linear issue object.
+     * @param {string} params.status - Run status label (e.g. "succeeded", "failed").
+     * @param {string} params.body - Comment body text.
+     * @param {string|null} [params.linkUrl] - Optional URL to include in the comment.
+     * @returns {Promise<object>} Publication result including `published`, `commentId`, and `url`.
+     */
     async publishRunUpdate({
       issue,
       status,
