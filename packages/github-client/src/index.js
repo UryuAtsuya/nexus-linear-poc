@@ -89,13 +89,20 @@ export function createGitHubClient({
           throw new Error("GitHub API publish currently supports pr-draft only.");
         }
 
+        const resolvedBase = await resolveSymbolicRef({
+          gitBin,
+          commandRunner,
+          cwd: run.repoRoot,
+          ref: baseRef
+        });
+
         const pullRequest = await createPullRequest({
           apiBaseUrl,
           token,
           fetchImpl,
           repository,
           output,
-          baseRef
+          baseRef: resolvedBase
         });
 
         return {
@@ -227,6 +234,20 @@ function resolveRepository({ issueRepository, owner, repo }) {
     owner: resolvedOwner,
     repo: resolvedRepo
   };
+}
+
+async function resolveSymbolicRef({ gitBin, commandRunner, cwd, ref }) {
+  try {
+    const branch = await runGit({
+      gitBin,
+      commandRunner,
+      cwd,
+      args: ["symbolic-ref", "--short", ref]
+    });
+    return branch || ref;
+  } catch {
+    return ref;
+  }
 }
 
 async function runGit({ gitBin, commandRunner, cwd, args }) {
