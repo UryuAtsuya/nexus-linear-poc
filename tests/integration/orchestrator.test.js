@@ -16,6 +16,38 @@ import { createLinearClient } from "../../packages/linear-client/src/index.js";
 
 const execFileAsync = promisify(execFile);
 
+test("runPrototype processes NEX-7 through the Issue Intake area with pr-draft target", async () => {
+  const result = await runPrototype({
+    issueId: "NEX-7",
+    fixturePath: "tests/fixtures/linear-issue.json",
+    writeArtifacts: false
+  });
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.issue.identifier, "NEX-7");
+  assert.equal(result.issue.priority, "low");
+  assert.equal(result.ontologyContext.riskSummary.overallRisk, "low");
+  assert.equal(result.policyDecision.allowed, true);
+  assert.equal(result.policyDecision.status, "approved");
+  assert.equal(result.githubOutput.target, "pr-draft");
+  assert.match(result.runnerOutput.branchName, /^codex\/nex-7-/);
+  assert.deepEqual(
+    result.timeline.map((entry) => entry.event),
+    [
+      "orchestrator.started",
+      "linear.issue.loaded",
+      "ontology.loaded",
+      "policy.evaluated",
+      "run.prepared",
+      "orchestrator.context.built",
+      "claude-runner.completed",
+      "github.output.prepared",
+      "github.output.published",
+      "orchestrator.completed"
+    ]
+  );
+});
+
 test("runPrototype completes the fixture-based happy path and writes artifacts", async (t) => {
   const outputDir = await mkdtemp(path.join(os.tmpdir(), "nexus-linear-run-"));
   t.after(async () => {

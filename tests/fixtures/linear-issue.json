@@ -1,5 +1,20 @@
 [
   {
+    "id": "NEX-7",
+    "identifier": "NEX-7",
+    "title": "タスク整理",
+    "description": "現状の内容確認と整理。Linear issue の取り込みから Orchestrator → Claude Runner → GitHub の一連のプロトタイプフローを検証する。",
+    "priority": "low",
+    "labels": [
+      "ai-ready",
+      "poc"
+    ],
+    "assignee": "pm@nexus.dev",
+    "repository": "uryuatsuya/nexus-linear-poc",
+    "team": "Nexus",
+    "state": "todo"
+  },
+  {
     "id": "NEX-101",
     "identifier": "NEX-101",
     "title": "Prototype the orchestrator happy path",
